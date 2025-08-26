@@ -1,6 +1,6 @@
-def main():
-    print("Hello from hedypet-streamlit!")
+import streamlit as st
+import pandas as pd
+import numpy as np
 
 
-if __name__ == "__main__":
-    main()
+st.title('Uber pickups in NYC')
