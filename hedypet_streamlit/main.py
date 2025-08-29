@@ -96,11 +96,11 @@ uncertainty_select = st.sidebar.selectbox("Uncertainty", options=list(uncertaint
 uncertainty = uncertainty_options[uncertainty_select]
 # Visualization options
 
-norm_selector = st.sidebar.selectbox("Normalization",options=list(norm_options.keys()),index=1)
+norm_selector = st.sidebar.selectbox("Normalization",options=list(norm_options.keys()),index=1,help="Select normalization method for the PET signal")
 norm_select = norm_options[norm_selector]
 
 erosion_options = ["None", "1 iteration", "2 iterations", "3 iterations"]
-erosion_select = st.sidebar.selectbox("Erosion", options=erosion_options, index=1)
+erosion_select = st.sidebar.selectbox("Erosion", options=erosion_options, index=1, help="Number of erosion iterations applied to organ mask")
 show_std = uncertainty_select != "None"
 
 # Time range filter
