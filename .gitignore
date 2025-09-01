@@ -1,6 +1,7 @@
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python
 hedypet_streamlit/v1.pkl
+axial_distribution_fdg/
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -9,7 +10,6 @@ __pycache__/
 *$py.class
 # C extensions
 *.so
-
 # Distribution / packaging
 .Python
 build/
