@@ -16,12 +16,17 @@ def generate_mu_data():
 
 @st.cache_data
 def generate_norm_data():
-    return pd.read_pickle(os.path.join(os.path.dirname(__file__),"norm.pkl")).set_index("sub")
+    return pd.read_pickle(os.path.join(os.path.dirname(__file__),"norm2.pkl")).set_index("sub")
 
 @st.cache_data
 def load_dist_data():
     """Load the temporal distribution data"""
     return np.load(os.path.join(os.path.dirname(__file__), "dist.npy"))
+
+@st.cache_data
+def load_means_data():
+    """Load the static organ means data"""
+    return pd.read_pickle(os.path.join(os.path.dirname(__file__), "means.pkl"))
 
 def calculate_summary_stats(df, group_cols, organs, erosion=1, norm="sul_ct",uncertainty="std"):
     """Calculate mean and std for grouped data"""
@@ -54,12 +59,15 @@ def calculate_summary_stats(df, group_cols, organs, erosion=1, norm="sul_ct",unc
 # Load data
 df = generate_mu_data()
 dist_data = load_dist_data()  # Load the new temporal distribution data
+means_data = load_means_data()  # Load static organ means data
 
 _norm = generate_norm_data()
 norm_options = {"SUV":"suv",
- "SUL (CT)": "sul_ct",
- "SUL (Janma)":"sul_janna",
- "SUL (James)": "sul_james"}
+ "SUL (Janma)": "sul_janma",
+ "SUL (James)": "sul_james",
+ "SUL (Decazes)": "sul_decazes",
+ "SUV ID": "suv_id",
+ "SUL ID": "sul_id"}
 
 list(_norm.columns)
 
@@ -75,6 +83,7 @@ st.title("📈 18F-FDG 100 Healthy Humans")
 chosen_id = stx.tab_bar(data=[
     stx.TabBarItemData(id="tab1", title="📊 Time activity curves", description="Time series analysis"),
     stx.TabBarItemData(id="tab2", title="📈 Axial distribution", description="Spatial distribution"),
+    stx.TabBarItemData(id="tab3", title="📦 Static organ analysis", description="Box plots and distributions"),
 ], default="tab1")
 
 # Show appropriate controls in sidebar based on active tab
@@ -134,6 +143,48 @@ with st.sidebar:
             value=0,
             help="Choose which time point to display the distribution for"
         )
+    
+    elif chosen_id == "tab3":
+        st.header("🎛️ Static Analysis Controls")
+        
+        # Grouping options - three separate dimensions
+        grouping_variables = ["None", "Age", "Sex", "Erosion", "Normalization", "Organ"]
+        
+        x_axis_group = st.selectbox("X-axis grouping:", grouping_variables, index=5, help="Primary grouping for x-axis")
+        color_group = st.selectbox("Color grouping:", grouping_variables, index=1, help="Secondary grouping for color hues")
+        pattern_group = st.selectbox("Pattern grouping:", grouping_variables, index=2, help="Tertiary grouping for different colors")
+        
+        # Get available regions from means data
+        available_regions = sorted(means_data['region'].unique())
+        
+        # Organ selector (conditional based on grouping)
+        if x_axis_group != "Organ" and color_group != "Organ" and pattern_group != "Organ":
+            # When not grouping by organ, select single organ
+            default_organ = "Liver" if "Liver" in available_regions else available_regions[0]
+            organ_select_static = st.selectbox("Organ", available_regions, index=available_regions.index(default_organ), help="Select organ to analyze")
+            organs_select_static = [organ_select_static]  # Convert to list for consistency
+        else:
+            # When grouping by organ, allow multiple organ selection
+            organs_select_static = st.multiselect("Organs to compare", available_regions, default=[], help="Select organs to include in the comparison")
+
+        # Normalization selector (conditional based on grouping)
+        if x_axis_group != "Normalization" and color_group != "Normalization" and pattern_group != "Normalization":
+            norm_selector_static = st.selectbox("Normalization",options=list(norm_options.keys()),index=1,help="Select normalization method for the PET signal")
+            norm_select_static = norm_options[norm_selector_static]
+            selected_norms = [norm_select_static]  # Single normalization
+            selected_norm_names = [norm_selector_static]
+        else:
+            # Allow multiple normalization selection when grouping by normalization
+            selected_norm_names = st.multiselect("Normalizations", options=list(norm_options.keys()), default=list(norm_options.keys())[:3], help="Select normalization methods to compare")
+            selected_norms = [norm_options[name] for name in selected_norm_names]
+            norm_selector_static = "Multiple"  # For display purposes
+
+        # Erosion options (for when erosion is NOT selected as grouping variable)
+        erosion_options = ["None", "1 iteration", "2 iterations", "3 iterations"]
+        if x_axis_group != "Erosion" and color_group != "Erosion" and pattern_group != "Erosion":
+            erosion_select_static = st.selectbox("Erosion", options=erosion_options, index=1, help="Number of erosion iterations applied to organ mask")
+        else:
+            erosion_select_static = None  # Will show all erosion levels
 
 # Ensure variables have default values for the non-active tab
 if chosen_id != "tab1":
@@ -149,8 +200,8 @@ if chosen_id != "tab1":
     organs = [ts_classes["liver"]]
     uncertainty_select = "95% CI"
     uncertainty = "95CI"
-    norm_selector = "SUL (CT)"
-    norm_select = "sul_ct"
+    norm_selector = "SUL (Janma)"
+    norm_select = "sul_janma"
     erosion_options = ["None", "1 iteration", "2 iterations", "3 iterations"]
     erosion_select = "1 iteration"
     show_std = True
@@ -159,6 +210,18 @@ if chosen_id != "tab1":
 if chosen_id != "tab2":
     # Default value for axial distribution controls
     selected_time = 0
+
+if chosen_id != "tab3":
+    # Default values for static analysis controls
+    x_axis_group = "Organ"
+    color_group = "Age"
+    pattern_group = "Sex"
+    organ_select_static = "Liver"
+    organs_select_static = ["Liver"]
+    norm_selector_static = "SUL (Janma)"
+    selected_norms = ["sul_janma"]
+    selected_norm_names = ["SUL (Janma)"]
+    erosion_select_static = "1 iteration"
 
 if chosen_id == "tab1":
 
@@ -317,6 +380,166 @@ if chosen_id == "tab1":
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
+elif chosen_id == "tab3":
+    # --- Static Organ Analysis Tab ---
+    
+    # Use the static means data
+    static_df = means_data.copy()
+    
+    # Merge with demographic data from norm file
+    demo_data = generate_norm_data().reset_index()
+    static_df = static_df.merge(demo_data[['sub', 'sex', 'demographic-group']], on='sub', how='left')
+    
+    # Filter by selected organs (using region names directly)
+    static_df = static_df[static_df.region.isin(organs_select_static)]
+    
+    # Apply erosion filter if erosion is not used for grouping
+    if erosion_select_static is not None:
+        # Map erosion option to actual value in data
+        erosion_mapping = {
+            "None": "0",
+            "1 iteration": "1", 
+            "2 iterations": "2",
+            "3 iterations": "3"
+        }
+        erosion_value = erosion_mapping[erosion_select_static]
+        static_df = static_df[static_df.erosion == erosion_value]
+    
+    # Apply normalization(s) - create separate rows for each normalization when grouping by normalization
+    if x_axis_group == "Normalization" or color_group == "Normalization" or pattern_group == "Normalization":
+        # Create multiple rows for different normalizations
+        normalized_dfs = []
+        for norm_name, norm_col in zip(selected_norm_names, selected_norms):
+            df_norm = static_df.copy()
+            norm_df = generate_norm_data()[norm_col]
+            df_norm["mult"] = df_norm["sub"].map(norm_df)
+            df_norm["mu"] /= df_norm["mult"]
+            df_norm["normalization"] = norm_name  # Add normalization as a grouping column
+            normalized_dfs.append(df_norm)
+        static_df = pd.concat(normalized_dfs, ignore_index=True)
+    else:
+        # Single normalization
+        norm_df = generate_norm_data()[selected_norms[0]]
+        static_df["mult"] = static_df["sub"].map(norm_df)
+        static_df["mu"] /= static_df["mult"]
+    
+    # Use region as organ name directly
+    static_df["organ_name"] = static_df["region"]
+    
+    # Check if we have any data left after filtering
+    if static_df.empty:
+        st.warning("No data available for the selected organs and filters.")
+        st.stop()
+    
+    # Map grouping variables to column names
+    def get_column_name(group_var):
+        if group_var == "Age":
+            return 'demographic-group'
+        elif group_var == "Sex":
+            return 'sex'
+        elif group_var == "Erosion":
+            return 'erosion'
+        elif group_var == "Normalization":
+            return 'normalization'
+        elif group_var == "Organ":
+            return 'organ_name'
+        else:
+            return None
+    
+    # Determine x-axis, color, and pattern mappings
+    x_col = get_column_name(x_axis_group)
+    color_col = get_column_name(color_group)
+    pattern_col = get_column_name(pattern_group)
+    
+    # Create title components
+    title_parts = []
+    if x_axis_group != "None":
+        title_parts.append(f"by {x_axis_group}")
+    if color_group != "None":
+        title_parts.append(f"colored by {color_group}")
+    if pattern_group != "None":
+        title_parts.append(f"patterned by {pattern_group}")
+    
+    title_suffix = f"Values" if norm_selector_static == "Multiple" else f"{norm_selector_static} Values"
+    title = f"Static Organ {title_suffix}"
+    if title_parts:
+        title += " " + ", ".join(title_parts)
+    
+    # Create the box plot with three-dimensional grouping
+    if x_col is None:
+        # No x-axis grouping - use a default
+        x_col = 'organ_name'
+    
+    # Handle pattern mapping (different colors within each color group)
+    if color_col and pattern_col and color_col != pattern_col:
+        # Combine color and pattern for unique coloring
+        static_df['color_pattern_group'] = static_df[color_col].astype(str) + " | " + static_df[pattern_col].astype(str)
+        fig_box = px.box(
+            static_df,
+            x=x_col,
+            y="mu",
+            color='color_pattern_group',
+            title=title
+        )
+    elif color_col:
+        # Only color grouping
+        fig_box = px.box(
+            static_df,
+            x=x_col,
+            y="mu", 
+            color=color_col,
+            title=title
+        )
+    else:
+        # No color grouping
+        fig_box = px.box(
+            static_df,
+            x=x_col,
+            y="mu",
+            title=title
+        )
+    
+    y_label = "Normalized Values" if norm_selector_static == "Multiple" else norm_selector_static
+    x_label = x_axis_group if x_axis_group != "None" else "Organ"
+    fig_box.update_layout(
+        xaxis_title=x_label,
+        yaxis_title=y_label,
+        height=600,
+        template='plotly_white'
+    )
+    
+    # Rotate x-axis labels if many categories or long names
+    if x_col == 'organ_name' and len(organs_select_static) > 3:
+        fig_box.update_xaxes(tickangle=45)
+    
+    st.plotly_chart(fig_box, use_container_width=True)
+    
+    # Summary statistics table
+    st.subheader("Summary Statistics")
+    
+    # Create grouping columns for summary stats
+    group_cols_for_stats = []
+    if x_col and x_col != 'organ_name':
+        group_cols_for_stats.append(x_col)
+    if color_col and color_col not in group_cols_for_stats:
+        group_cols_for_stats.append(color_col)
+    if pattern_col and pattern_col not in group_cols_for_stats:
+        group_cols_for_stats.append(pattern_col)
+    
+    # Always include organ_name in grouping
+    if 'organ_name' not in group_cols_for_stats:
+        group_cols_for_stats = ['organ_name'] + group_cols_for_stats
+    
+    if group_cols_for_stats:
+        summary_stats = static_df.groupby(group_cols_for_stats)['mu'].agg(['count', 'mean', 'std', 'min', 'max']).round(3)
+    else:
+        summary_stats = static_df.groupby('organ_name')['mu'].agg(['count', 'mean', 'std', 'min', 'max']).round(3)
+    
+    # Add coefficient of variation (CV = std/mean)
+    summary_stats['cv'] = (summary_stats['std'] / summary_stats['mean']).round(3)
+    
+    st.dataframe(summary_stats, use_container_width=True)
 
 elif chosen_id == "tab2":
 
