@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+import extra_streamlit_components as stx
 import json 
 import os 
 
@@ -71,53 +71,96 @@ ts_classes = {v:int(k) for k,v in ts_classes_orig.items()}
 # Title and description
 st.title("📈 18F-FDG 100 Healthy Humans")
 
-# Create tabs for different visualizations
-tab1, tab2 = st.tabs(["📊 Time activity curves", "📈 Axial distribution"])
+# Create tab bar with extra-streamlit-components
+chosen_id = stx.tab_bar(data=[
+    stx.TabBarItemData(id="tab1", title="📊 Time activity curves", description="Time series analysis"),
+    stx.TabBarItemData(id="tab2", title="📈 Axial distribution", description="Spatial distribution"),
+], default="tab1")
 
-with tab1:
-    # --- Sidebar Controls for Tab 1 ---
-    st.sidebar.header("🎛️ Time Series Controls")
+# Show appropriate controls in sidebar based on active tab
+with st.sidebar:
+    if chosen_id == "tab1":
+        st.header("🎛️ Time Series Controls")
+        
+        # Grouping options
+        grouping_options = {
+            'None': [],
+            'Gender': ['gender'],
+            'Age': ['age-group'],
+            'Gender + Age': ['gender', 'age-group']
+        }
+        group_by = st.selectbox("Group by:", options=list(grouping_options.keys()), index=1)
 
-    # Grouping options
+        # Organs multiselect
+        organs_select = st.multiselect("Organ", list(ts_classes.keys()), default=["liver"])
+        organs = [ts_classes[organ] for organ in organs_select]
+
+        # Uncertainty options
+        uncertainty_options = {
+            "None": "none",
+            "±1std": "std",
+            "95% CI": "95CI",
+            "95% PI": "95PI"
+        }
+        uncertainty_select = st.selectbox("Uncertainty", options=list(uncertainty_options.keys()), index=2)
+        uncertainty = uncertainty_options[uncertainty_select]
+
+        # Normalization selector
+        norm_selector = st.selectbox("Normalization",options=list(norm_options.keys()),index=1,help="Select normalization method for the PET signal")
+        norm_select = norm_options[norm_selector]
+
+        # Erosion options
+        erosion_options = ["None", "1 iteration", "2 iterations", "3 iterations"]
+        erosion_select = st.selectbox("Erosion", options=erosion_options, index=1, help="Number of erosion iterations applied to organ mask")
+        show_std = uncertainty_select != "None"
+
+        # Time range filter
+        time_range = st.slider(
+            "Time (seconds):",
+            min_value=0,
+            max_value=4050,
+            value=(0, 4050),
+            help="Filter data to a specific time range"
+        )
+    
+    elif chosen_id == "tab2":
+        st.header("🎛️ Axial Distribution Controls")
+        
+        # Time slider for selecting which second to display
+        selected_time = st.slider(
+            "Select Time Point (seconds):",
+            min_value=0,
+            max_value=min(4049, dist_data.shape[0] - 1),  # Ensure we don't exceed array bounds
+            value=0,
+            help="Choose which time point to display the distribution for"
+        )
+
+# Ensure variables have default values for the non-active tab
+if chosen_id != "tab1":
+    # Default values for time series controls
     grouping_options = {
         'None': [],
         'Gender': ['gender'],
         'Age': ['age-group'],
         'Gender + Age': ['gender', 'age-group']
     }
-    group_by = st.sidebar.selectbox("Group by:", options=list(grouping_options.keys()), index=1)
-
-    # Organs multiselect
-    organs_select = st.sidebar.multiselect("Organ", list(ts_classes.keys()), default=["liver"])
-    organs = [ts_classes[organ] for organ in organs_select]
-
-    # Uncertainty options
-    uncertainty_options = {
-        "None": "none",
-        "±1std": "std",
-        "95% CI": "95CI",
-        "95% PI": "95PI"
-    }
-    uncertainty_select = st.sidebar.selectbox("Uncertainty", options=list(uncertainty_options.keys()), index=2)
-    uncertainty = uncertainty_options[uncertainty_select]
-
-    # Normalization selector
-    norm_selector = st.sidebar.selectbox("Normalization",options=list(norm_options.keys()),index=1,help="Select normalization method for the PET signal")
-    norm_select = norm_options[norm_selector]
-
-    # Erosion options
+    group_by = 'Gender'
+    organs_select = ["liver"]
+    organs = [ts_classes["liver"]]
+    uncertainty_select = "95% CI"
+    uncertainty = "95CI"
+    norm_selector = "SUL (CT)"
+    norm_select = "sul_ct"
     erosion_options = ["None", "1 iteration", "2 iterations", "3 iterations"]
-    erosion_select = st.sidebar.selectbox("Erosion", options=erosion_options, index=1, help="Number of erosion iterations applied to organ mask")
-    show_std = uncertainty_select != "None"
+    erosion_select = "1 iteration"
+    show_std = True
+    time_range = (0, 4050)
 
-    # Time range filter
-    time_range = st.sidebar.slider(
-        "Time (seconds):",
-        min_value=0,
-        max_value=4050,
-        value=(0, 4050),
-        help="Filter data to a specific time range"
-    )
+if chosen_id != "tab2":
+    # Default value for axial distribution controls
+    selected_time = 0
+
+if chosen_id == "tab1":
 
     # --- Data Processing ---
     # Filter data by time range first
@@ -275,18 +318,7 @@ with tab1:
 
     st.plotly_chart(fig, use_container_width=True)
 
-with tab2:
-    
-    # Controls for the temporal distribution
-
-    # Time slider for selecting which second to display
-    selected_time = st.slider(
-        "Select Time Point (seconds):",
-        min_value=0,
-        max_value=min(4049, dist_data.shape[0] - 1),  # Ensure we don't exceed array bounds
-        value=0,
-        help="Choose which time point to display the distribution for"
-    )
+elif chosen_id == "tab2":
 
 
     
