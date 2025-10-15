@@ -33,6 +33,11 @@ def load_tacs_data():
     """Load the time activity curves data"""
     return pd.read_pickle(os.path.join(os.path.dirname(__file__), "tacs.pkl"))
 
+@st.cache_data
+def load_patlak_data():
+    """Load the Patlak analysis data"""
+    return pd.read_pickle(os.path.join(os.path.dirname(__file__), "patlak.pkl"))
+
 def calculate_summary_stats(df, group_cols, organs, erosion=1, norm="sul_ct",uncertainty="std"):
     """Calculate mean and std for grouped data"""
     # This function now simply USES the group_cols list it's given.
@@ -66,6 +71,7 @@ df = generate_mu_data()  # Keep for backward compatibility if needed
 dist_data = load_dist_data()  # Load the new temporal distribution data
 means_data = load_means_data()  # Load static organ means data
 tacs_data = load_tacs_data()  # Load time activity curves data
+patlak_data = load_patlak_data()  # Load Patlak analysis data
 
 _norm = generate_norm_data()
 norm_options = {"SUV":"suv",
@@ -89,7 +95,8 @@ st.title("📈 18F-FDG 100 Healthy Humans")
 chosen_id = stx.tab_bar(data=[
     stx.TabBarItemData(id="tab1", title="Time Activity Curves", description=""),
     stx.TabBarItemData(id="tab2", title="Static Organ Readouts", description=""),
-    stx.TabBarItemData(id="tab3", title="Axial Distribution", description=""),
+    stx.TabBarItemData(id="tab4", title="Patlak", description=""),
+    stx.TabBarItemData(id="tab3", title="Misc. Visualizations", description=""),
 ], default="tab1")
 
 # Show appropriate controls in sidebar based on active tab
@@ -102,7 +109,7 @@ with st.sidebar:
 
         # Color grouping for time activity curves
         grouping_variables = ["None", "Age", "Sex", "Erosion", "Normalization", "Organ"]
-        color_group_tacs = st.selectbox("Color grouping:", grouping_variables, index=0, help="Group curves by color", key="tacs_color")
+        color_group_tacs = st.selectbox("Color grouping:", grouping_variables, index=5, help="Group curves by color", key="tacs_color")  # index=5 is "Organ"
 
         # Organ selector (conditional based on grouping)
         if color_group_tacs != "Organ":
@@ -112,12 +119,15 @@ with st.sidebar:
             organs_select_tacs = [organ_select_tacs]
         else:
             # When grouping by organ, allow multiple organ selection
-            default_organs_multi_tacs = ["Liver", "Aorta"] if all(organ in available_regions_tacs for organ in ["Liver", "Aorta"]) else available_regions_tacs[:2]
+            default_organs_multi_tacs = ["Liver", "Gray matter", "Skeletal muscle"] if all(organ in available_regions_tacs for organ in ["Liver", "Gray matter", "Skeletal muscle"]) else available_regions_tacs[:3]
             organs_select_tacs = st.multiselect("Organs to compare", available_regions_tacs, default=default_organs_multi_tacs, help="Select organs to include in the comparison")
 
         # Normalization selector (conditional based on grouping)
         if color_group_tacs != "Normalization":
-            norm_selector_tacs = st.selectbox("Normalization",options=list(norm_options.keys()),index=1,help="Select normalization method for the PET signal", key="tacs_norm")
+            # Default to SUL ID (index 5 in the norm_options dict keys)
+            norm_keys = list(norm_options.keys())
+            sul_id_index = norm_keys.index("SUL ID") if "SUL ID" in norm_keys else 1
+            norm_selector_tacs = st.selectbox("Normalization",options=norm_keys,index=sul_id_index,help="Select normalization method for the PET signal", key="tacs_norm")
             norm_select_tacs = norm_options[norm_selector_tacs]
             selected_norms_tacs = [norm_select_tacs]
             selected_norm_names_tacs = [norm_selector_tacs]
@@ -138,8 +148,8 @@ with st.sidebar:
 
         # Confidence interval options
         uncertainty_options = ["None", "1 std", "95CI", "95PI"]
-        uncertainty_tacs = st.selectbox("Confidence intervals:", uncertainty_options, index=1, help="Type of uncertainty bands to display", key="tacs_uncertainty")
-        
+        uncertainty_tacs = st.selectbox("Confidence intervals:", uncertainty_options, index=2, help="Type of uncertainty bands to display", key="tacs_uncertainty")  # index=2 is "95CI"
+
         # Time axis toggle
         use_actual_time = st.toggle("Use actual time (seconds)", value=True, help="Toggle between frame numbers (tix) and actual time (t)")
         
@@ -216,7 +226,7 @@ with st.sidebar:
     
     elif chosen_id == "tab3":
         st.header("🎛️ Axial Distribution Controls")
-        
+
         # Time slider for selecting which second to display
         selected_time = st.slider(
             "Select Time Point (seconds):",
@@ -226,18 +236,153 @@ with st.sidebar:
             help="Choose which time point to display the distribution for"
         )
 
+    elif chosen_id == "tab4":
+        st.header("🎛️ Patlak Analysis Controls")
+
+        # Get available regions from Patlak data
+        available_regions_patlak = sorted(patlak_data['region'].unique())
+
+        # Grouping options for two dimensions (similar to static tab)
+        grouping_variables_patlak = ["None", "Age", "Sex", "Erosion", "Input Function", "Organ", "Frames"]
+
+        x_axis_group_patlak = st.selectbox("X-axis grouping:", grouping_variables_patlak, index=5, help="Primary grouping for x-axis", key="patlak_x_axis")  # index=5 is "Organ"
+        color_group_patlak = st.selectbox("Color grouping:", grouping_variables_patlak, index=6, help="Secondary grouping for color hues", key="patlak_color")  # index=6 is "Frames"
+
+        # Organ selector (conditional based on grouping)
+        if x_axis_group_patlak != "Organ" and color_group_patlak != "Organ":
+            # When not grouping by organ, select single organ
+            default_organ_patlak = "Brain" if "Brain" in available_regions_patlak else available_regions_patlak[0]
+            organ_select_patlak = st.selectbox("Organ", available_regions_patlak, index=available_regions_patlak.index(default_organ_patlak), help="Select organ to analyze", key="patlak_organ")
+            organs_select_patlak = [organ_select_patlak]
+        else:
+            # When grouping by organ, allow multiple organ selection
+            default_organs_multi_patlak = ["White matter", "Gray matter"] if all(organ in available_regions_patlak for organ in ["White matter", "Gray matter"]) else available_regions_patlak[:2]
+            organs_select_patlak = st.multiselect("Organs to compare", available_regions_patlak, default=default_organs_multi_patlak, help="Select organs to include in the comparison", key="patlak_organs")
+
+        # Input function selector (combination of voi_volume and aorta_voi)
+        # Get unique combinations of input function parameters and sort by aorta_voi
+        input_functions = patlak_data[['voi_volume', 'aorta_voi']].drop_duplicates()
+        # Sort by aorta_voi: Ascending, Top (or Ascending top), Descending top, Descending bottom
+        sort_order = {'Ascending': 0, 'Top': 1, 'Ascending top': 1, 'Descending top': 2, 'Descending bottom': 3}
+        input_functions['sort_key'] = input_functions['aorta_voi'].map(lambda x: sort_order.get(x, 999))
+        input_functions = input_functions.sort_values('sort_key').drop('sort_key', axis=1)
+
+        # Abbreviate aorta_voi names
+        def abbreviate_aorta_voi(name):
+            name = name.replace('Ascending', 'Asc.')
+            name = name.replace('Descending', 'Des.')
+            name = name.replace('top', 'top')
+            name = name.replace('bottom', 'bot.')
+            return name
+
+        input_function_labels = [f"{abbreviate_aorta_voi(row['aorta_voi'])} ({row['voi_volume']})" for _, row in input_functions.iterrows()]
+
+        if x_axis_group_patlak != "Input Function" and color_group_patlak != "Input Function":
+            # Single input function selection
+            # Try to find "Des. bot. (1mL, 3px width)" as default
+            default_label = "Des. bot. (1mL, 3px width)"
+            default_input_idx = input_function_labels.index(default_label) if default_label in input_function_labels else 0
+            input_function_select = st.selectbox(
+                "Input Function",
+                options=input_function_labels,
+                index=default_input_idx,
+                help="Select input function defined by aorta VOI and volume",
+                key="patlak_input"
+            )
+            selected_input_functions = [input_function_select]
+        else:
+            # Multiple input function selection
+            # Default to "Des. bot. (1mL, 3px width)" if available
+            default_label = "Des. bot. (1mL, 3px width)"
+            default_inputs = [default_label] if default_label in input_function_labels else input_function_labels[:1]
+            selected_input_functions = st.multiselect(
+                "Input Functions",
+                options=input_function_labels,
+                default=default_inputs,
+                help="Select input functions to compare",
+                key="patlak_inputs"
+            )
+
+        # Erosion options (conditional based on grouping)
+        erosion_options = ["None", "1 iteration", "2 iterations", "3 iterations"]
+        if x_axis_group_patlak != "Erosion" and color_group_patlak != "Erosion":
+            erosion_select_patlak = st.selectbox("Erosion", options=erosion_options, index=1, help="Number of erosion iterations applied to organ mask", key="patlak_erosion")
+            selected_erosions_patlak = None  # Not used when not grouping by erosion
+        else:
+            # When grouping by erosion, allow multiple erosion selection
+            default_erosions = ["None", "1 iteration"]
+            selected_erosions_patlak = st.multiselect("Erosions to compare", options=erosion_options, default=default_erosions, help="Select erosion iterations to include in the comparison", key="patlak_erosions")
+            erosion_select_patlak = None  # Not used when grouping by erosion
+
+        # Frame selector - single value or range depending on grouping
+        min_frames = int(patlak_data['frames'].min())
+        max_frames = int(patlak_data['frames'].max())
+
+        # Time vector for dynamic PET frames (in seconds)
+        time_vector = [1,3,5,7,9,11.0,13.0,15.0,17.0,19.0,21.0,23.0,25.0,27.0,29.0,31.0,33.0,35.0,37.0,39.0,42.5,47.5,52.5,57.5,62.5,67.5,72.5,77.5,82.5,87.5,95.0,105,115,125,135,145,155,165,175,185,195,205,215,225,235,270,330,390,450,510,570,660,780,900,1020,1140,1260,1380,1500,1620,1740,1950,2250,2550,2850,3150,3450,3750,4050]
+
+        def get_patlak_time_range(n_frames):
+            """Get the time range for Patlak analysis using the last N frames"""
+            # Patlak uses the last n_frames from the time vector
+            if n_frames <= 0 or n_frames > len(time_vector):
+                return None, None
+
+            start_time_sec = time_vector[-n_frames]
+            end_time_sec = time_vector[-1]
+
+            # Convert to minutes
+            start_time_min = start_time_sec / 60.0
+            end_time_min = end_time_sec / 60.0
+
+            return start_time_min, end_time_min
+
+        if x_axis_group_patlak == "Frames" or color_group_patlak == "Frames":
+            # Range slider when grouping by frames
+            # Default range is 4-6 if available, otherwise use min-max
+            default_range_start = 4 if 4 >= min_frames and 4 <= max_frames else min_frames
+            default_range_end = 6 if 6 >= min_frames and 6 <= max_frames else max_frames
+            frames_range = st.slider(
+                "Number of frames range:",
+                min_value=min_frames,
+                max_value=max_frames,
+                value=(default_range_start, default_range_end),
+                help="Select range of frames to include in Patlak analysis"
+            )
+            # Display corresponding time ranges for the selected frame range
+            start_min_min, start_max_min = get_patlak_time_range(frames_range[0])
+            end_min_min, end_max_min = get_patlak_time_range(frames_range[1])
+            if start_min_min is not None and end_max_min is not None:
+                st.caption(f"Time range: {frames_range[0]} frames ({start_min_min:.1f}-{start_max_min:.1f} min) to {frames_range[1]} frames ({end_min_min:.1f}-{end_max_min:.1f} min)")
+            selected_frames = None  # Not used in this mode
+        else:
+            # Single value slider when not grouping by frames
+            # Default to 5 frames if available, otherwise use max
+            default_frame = 5 if 5 >= min_frames and 5 <= max_frames else max_frames
+            selected_frames = st.slider(
+                "Number of frames:",
+                min_value=min_frames,
+                max_value=max_frames,
+                value=default_frame,
+                help="Select number of frames used in Patlak analysis"
+            )
+            # Display corresponding time range
+            start_min, end_min = get_patlak_time_range(selected_frames)
+            if start_min is not None and end_min is not None:
+                st.caption(f"Time range: {start_min:.1f}-{end_min:.1f} min (last {selected_frames} frames)")
+            frames_range = None  # Not used in this mode
+
 # Ensure variables have default values for the non-active tab
 if chosen_id != "tab1":
-    # Default values for time series controls  
-    color_group_tacs = "None"
+    # Default values for time series controls
+    color_group_tacs = "Organ"
     organ_select_tacs = "Liver"
-    organs_select_tacs = ["Liver"]
-    norm_selector_tacs = "SUL (Janma)"
-    selected_norms_tacs = ["sul_janma"]
-    selected_norm_names_tacs = ["SUL (Janma)"]
+    organs_select_tacs = ["Liver", "Gray matter", "Skeletal muscle"]
+    norm_selector_tacs = "SUL ID"
+    selected_norms_tacs = ["sul_id"]
+    selected_norm_names_tacs = ["SUL ID"]
     erosion_select_tacs = "1 iteration"
-    time_range = (0, 100)
-    uncertainty_tacs = "1 std"
+    time_range = (0, 4200)  # Full time range in seconds
+    uncertainty_tacs = "95CI"
     use_actual_time = True
     time_column = 't'
 
@@ -255,6 +400,18 @@ if chosen_id != "tab2":
 if chosen_id != "tab3":
     # Default value for axial distribution controls
     selected_time = 0
+
+if chosen_id != "tab4":
+    # Default values for Patlak controls
+    x_axis_group_patlak = "Organ"
+    color_group_patlak = "Frames"
+    organ_select_patlak = "Brain"
+    organs_select_patlak = ["White matter", "Gray matter"]
+    selected_input_functions = ["Des. bot. (1mL, 3px width)"]
+    erosion_select_patlak = "1 iteration"
+    selected_erosions_patlak = None
+    selected_frames = 5
+    frames_range = (4, 6)
 
 if chosen_id == "tab1":
     # --- Time Activity Curves Tab using TACS data ---
@@ -733,3 +890,213 @@ elif chosen_id == "tab3":
     else:
         st.error(f"Selected time point ({selected_time}) exceeds available data range.")
         st.info(f"Available time range: 0 to {dist_data.shape[0] - 1} seconds")
+
+elif chosen_id == "tab4":
+    # --- Patlak Analysis Tab ---
+
+    # Use the Patlak data
+    patlak_df = patlak_data.copy()
+
+    # Merge with demographic data from norm file
+    demo_data = generate_norm_data().reset_index()
+    patlak_df = patlak_df.merge(demo_data[['sub', 'sex', 'demographic-group']], on='sub', how='left')
+
+    # Filter by frame count (single value or range)
+    if selected_frames is not None:
+        # Single frame value - not grouping by frames
+        patlak_df = patlak_df[patlak_df['frames'] == selected_frames]
+    elif frames_range is not None:
+        # Frame range - grouping by frames
+        patlak_df = patlak_df[(patlak_df['frames'] >= frames_range[0]) & (patlak_df['frames'] <= frames_range[1])]
+
+    # Filter by selected organs (using region names directly)
+    patlak_df = patlak_df[patlak_df.region.isin(organs_select_patlak)]
+
+    # Apply erosion filter
+    erosion_mapping = {
+        "None": "0",
+        "1 iteration": "1",
+        "2 iterations": "2",
+        "3 iterations": "3"
+    }
+
+    if erosion_select_patlak is not None:
+        # Single erosion value - not grouping by erosion
+        erosion_value = erosion_mapping[erosion_select_patlak]
+        patlak_df = patlak_df[patlak_df.erosion == erosion_value]
+    elif selected_erosions_patlak is not None and len(selected_erosions_patlak) > 0:
+        # Multiple erosion values - grouping by erosion
+        erosion_values = [erosion_mapping[e] for e in selected_erosions_patlak]
+        patlak_df = patlak_df[patlak_df.erosion.isin(erosion_values)]
+
+    # Helper function to parse abbreviated input function label back to original values
+    def parse_input_function_label(label):
+        """Parse abbreviated label like 'Asc. (1mL, 3px width)' back to original aorta_voi and voi_volume"""
+        aorta_voi_abbrev = label.split(' (')[0]
+        voi_volume = label.split('(')[1].rstrip(')')
+
+        # Convert abbreviated name back to original
+        aorta_voi = aorta_voi_abbrev.replace('Asc.', 'Ascending')
+        aorta_voi = aorta_voi.replace('Des.', 'Descending')
+        aorta_voi = aorta_voi.replace('bot.', 'bottom')
+
+        return aorta_voi, voi_volume
+
+    # Helper function to abbreviate aorta_voi for display
+    def abbreviate_aorta_voi_display(name):
+        """Abbreviate aorta_voi name for display"""
+        name = name.replace('Ascending', 'Asc.')
+        name = name.replace('Descending', 'Des.')
+        name = name.replace('bottom', 'bot.')
+        return name
+
+    # Filter by input function(s)
+    if x_axis_group_patlak != "Input Function" and color_group_patlak != "Input Function":
+        # Single input function - parse the label back to voi_volume and aorta_voi
+        if selected_input_functions:
+            input_label = selected_input_functions[0]
+            aorta_voi, voi_volume = parse_input_function_label(input_label)
+            patlak_df = patlak_df[(patlak_df.aorta_voi == aorta_voi) & (patlak_df.voi_volume == voi_volume)]
+            patlak_df['input_function'] = input_label
+    else:
+        # Multiple input functions - create label for grouping
+        if selected_input_functions:
+            # Filter to only include selected input functions
+            filtered_dfs = []
+            for input_label in selected_input_functions:
+                aorta_voi, voi_volume = parse_input_function_label(input_label)
+                df_temp = patlak_df[(patlak_df.aorta_voi == aorta_voi) & (patlak_df.voi_volume == voi_volume)].copy()
+                df_temp['input_function'] = input_label
+                filtered_dfs.append(df_temp)
+            patlak_df = pd.concat(filtered_dfs, ignore_index=True)
+        else:
+            # If no input functions selected, create abbreviated label for all
+            patlak_df['input_function'] = patlak_df.apply(
+                lambda row: f"{abbreviate_aorta_voi_display(row['aorta_voi'])} ({row['voi_volume']})",
+                axis=1
+            )
+
+    # Use region as organ name directly
+    patlak_df["organ_name"] = patlak_df["region"]
+
+    # Convert slope to Ki * 1000 for better readability
+    patlak_df["ki_1000"] = patlak_df["slope"] * 1000
+
+    # Check if we have any data left after filtering
+    if patlak_df.empty:
+        st.warning("No data available for the selected organs and filters.")
+        st.stop()
+
+    # Map grouping variables to column names
+    def get_column_name_patlak(group_var):
+        if group_var == "Age":
+            return 'demographic-group'
+        elif group_var == "Sex":
+            return 'sex'
+        elif group_var == "Erosion":
+            return 'erosion'
+        elif group_var == "Input Function":
+            return 'input_function'
+        elif group_var == "Organ":
+            return 'organ_name'
+        elif group_var == "Frames":
+            return 'frames'
+        else:
+            return None
+
+    # Determine x-axis and color mappings
+    x_col_patlak = get_column_name_patlak(x_axis_group_patlak)
+    color_col_patlak = get_column_name_patlak(color_group_patlak)
+
+    # Create title components
+    title_parts = []
+    if x_axis_group_patlak != "None":
+        title_parts.append(f"by {x_axis_group_patlak}")
+    if color_group_patlak != "None":
+        title_parts.append(f"colored by {color_group_patlak}")
+
+    # Title depends on whether we're grouping by frames or using a single frame value
+    if selected_frames is not None:
+        title = f"Patlak K<sub>i</sub> Analysis ({selected_frames} frames)"
+    elif frames_range is not None:
+        if frames_range[0] == frames_range[1]:
+            title = f"Patlak K<sub>i</sub> Analysis ({frames_range[0]} frames)"
+        else:
+            title = f"Patlak K<sub>i</sub> Analysis ({frames_range[0]}-{frames_range[1]} frames)"
+    else:
+        title = "Patlak K<sub>i</sub> Analysis"
+
+    if title_parts:
+        title += " " + ", ".join(title_parts)
+
+    # Create the box plot with two-dimensional grouping (similar to static tab)
+    if x_col_patlak is None:
+        # No x-axis grouping - use a default
+        x_col_patlak = 'organ_name'
+
+    if color_col_patlak:
+        # Color grouping
+        fig_patlak = px.box(
+            patlak_df,
+            x=x_col_patlak,
+            y="ki_1000",
+            color=color_col_patlak,
+            title=title
+        )
+    else:
+        # No color grouping
+        fig_patlak = px.box(
+            patlak_df,
+            x=x_col_patlak,
+            y="ki_1000",
+            title=title
+        )
+
+    x_label = x_axis_group_patlak if x_axis_group_patlak != "None" else "Organ"
+    fig_patlak.update_layout(
+        xaxis_title=x_label,
+        yaxis_title="K<sub>i</sub> [10<sup>-3</sup> min<sup>-1</sup>]",
+        height=600,
+        template='plotly_white'
+    )
+
+    # Update box plot to show mean values and improve hover formatting
+    fig_patlak.update_traces(
+        boxmean=True,
+        hovertemplate='<b>%{x}</b><br>' +
+                     'K<sub>i</sub>: %{y:.3f} × 10<sup>-3</sup><br>' +
+                     '<extra></extra>'
+    )
+
+    # Rotate x-axis labels if many categories or long names
+    if x_col_patlak == 'organ_name' and len(organs_select_patlak) > 3:
+        fig_patlak.update_xaxes(tickangle=45)
+
+    st.plotly_chart(fig_patlak, use_container_width=True)
+
+    # Summary statistics table
+    st.subheader("Summary Statistics")
+
+    # Create grouping columns for summary stats
+    group_cols_for_stats = []
+    if x_col_patlak and x_col_patlak != 'organ_name':
+        group_cols_for_stats.append(x_col_patlak)
+    if color_col_patlak and color_col_patlak not in group_cols_for_stats:
+        group_cols_for_stats.append(color_col_patlak)
+
+    # Always include organ_name in grouping
+    if 'organ_name' not in group_cols_for_stats:
+        group_cols_for_stats = ['organ_name'] + group_cols_for_stats
+
+    if group_cols_for_stats:
+        summary_stats = patlak_df.groupby(group_cols_for_stats)['ki_1000'].agg(['count', 'mean', 'std', 'min', lambda x: x.quantile(0.25), 'median', lambda x: x.quantile(0.75), 'max']).round(3)
+    else:
+        summary_stats = patlak_df.groupby('organ_name')['ki_1000'].agg(['count', 'mean', 'std', 'min', lambda x: x.quantile(0.25), 'median', lambda x: x.quantile(0.75), 'max']).round(3)
+
+    # Rename the lambda columns to proper names
+    summary_stats.columns = ['count', 'mean [×10⁻³]', 'std [×10⁻³]', 'min [×10⁻³]', 'Q1 [×10⁻³]', 'median [×10⁻³]', 'Q3 [×10⁻³]', 'max [×10⁻³]']
+
+    # Add coefficient of variation (CV = std/mean) as percentage
+    summary_stats['Coefficient of Variation [%]'] = (summary_stats['std [×10⁻³]'] / summary_stats['mean [×10⁻³]'].abs() * 100).round(1)
+
+    st.dataframe(summary_stats, use_container_width=True)
