@@ -22,4 +22,4 @@ docker compose run --rm certbot certonly --webroot \
     -d ${domains[0]}
 
 echo "### Reloading nginx..."
-docker composeexec nginx nginx -s reload
+docker compose exec nginx nginx -s reload
