@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
 # Copy project files
 COPY pyproject.toml ./
 COPY hedypet_streamlit/ ./hedypet_streamlit/
-COPY .env ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
