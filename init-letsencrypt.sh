@@ -13,7 +13,7 @@ echo "### Requesting Let's Encrypt certificate for ${domains[0]}..."
 
 if [ $staging != "0" ]; then staging_arg="--staging"; fi
 
-docker composerun --rm certbot certonly --webroot \
+docker compose run --rm certbot certonly --webroot \
     --webroot-path=/var/www/certbot \
     $staging_arg \
     --email $email \
