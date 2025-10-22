@@ -13,7 +13,7 @@ echo "### Requesting Let's Encrypt certificate for ${domains[0]}..."
 
 if [ $staging != "0" ]; then staging_arg="--staging"; fi
 
-docker-compose run --rm certbot certonly --webroot \
+docker composerun --rm certbot certonly --webroot \
     --webroot-path=/var/www/certbot \
     $staging_arg \
     --email $email \
@@ -22,4 +22,4 @@ docker-compose run --rm certbot certonly --webroot \
     -d ${domains[0]}
 
 echo "### Reloading nginx..."
-docker-compose exec nginx nginx -s reload
+docker composeexec nginx nginx -s reload
