@@ -14,7 +14,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
+#    ports:
+#     - "8501:8501"
   nginx:
     image: nginx:alpine
     container_name: hedypet-nginx

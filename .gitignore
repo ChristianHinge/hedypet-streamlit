@@ -2,7 +2,7 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python
 hedypet_streamlit/v1.pkl
 axial_distribution_fdg/
-
+certbot/
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
