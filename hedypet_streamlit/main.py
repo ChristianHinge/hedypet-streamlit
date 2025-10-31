@@ -16,20 +16,15 @@ st.markdown("""
     /* Reduce top padding but leave room for header */
     .block-container {
         padding-top: 3rem;
-        padding-bottom: 0rem;
+        padding-bottom: 3rem;
     }
     /* Keep header compact and fixed */
     header[data-testid="stHeader"] {
-        background-color: rgba(255, 255, 255, 0.9);
         backdrop-filter: blur(10px);
         height: 2.5rem;
         position: fixed;
         top: 0;
         z-index: 999;
-    }
-    /* Dark mode header background */
-    [data-testid="stHeader"] {
-        background-color: var(--background-color);
     }
     /* Reduce sidebar top padding */
     section[data-testid="stSidebar"] > div:first-child {
@@ -115,23 +110,20 @@ ts_classes = {v:int(k) for k,v in ts_classes_orig.items()}
 
 # Create tab bar with extra-streamlit-components
 chosen_id = stx.tab_bar(data=[
+    stx.TabBarItemData(id="tab5", title="About", description=""),
     stx.TabBarItemData(id="tab1", title="Time Activity Curves", description=""),
     stx.TabBarItemData(id="tab2", title="Organ Means", description=""),
     stx.TabBarItemData(id="tab4", title="Patlak", description=""),
-    stx.TabBarItemData(id="tab5", title="About", description=""),
-], default="tab1")
+], default="tab5")
 
 # Show appropriate controls in sidebar based on active tab
 with st.sidebar:
     # Use custom HTML with negative margin to pull content up (leave room for collapse button)
     st.markdown('''
-        <h1 style="margin-top: -2rem; margin-bottom: 0.25rem;">hedyPET</h1>
-        <p style="margin-top: 0; margin-bottom: 1rem; color: gray; font-size: 0.9rem;">Data Explorer</p>
+        <h1 style="margin-top: -2rem; margin-bottom: 1rem;">hedyPET</h1>
     ''', unsafe_allow_html=True)
 
     if chosen_id == "tab1":
-        st.subheader("Controls")
-
         # Get available regions from tacs data
         available_regions_tacs = sorted(tacs_data['region'].unique())
 
@@ -210,8 +202,6 @@ with st.sidebar:
             time_column = 'Frame Index'
     
     elif chosen_id == "tab2":
-        st.subheader("Controls")
-        
         # Grouping options - two dimensions
         grouping_variables = ["None", "Age", "Sex", "Erosion", "Normalization", "Organ"]
         
@@ -255,8 +245,6 @@ with st.sidebar:
             erosion_select_static = None  # Will show all erosion levels
     
     elif chosen_id == "tab4":
-        st.subheader("Controls")
-
         # Get available regions from Patlak data
         available_regions_patlak = sorted(patlak_data['region'].unique())
 
@@ -682,7 +670,6 @@ if chosen_id == "tab1":
             y=0.98,
             xanchor="right",
             x=0.98,
-            bgcolor='rgba(255, 255, 255, 0.7)',
         ),
         margin=dict(l=50, r=20, t=0, b=50)
     )
@@ -1050,43 +1037,9 @@ elif chosen_id == "tab4":
 
 elif chosen_id == "tab5":
     # --- About Tab ---
-    st.markdown("""
-    # About hedyPET
+    # Load about content from markdown file
+    about_path = os.path.join(os.path.dirname(__file__), "about.md")
+    with open(about_path, "r") as f:
+        about_content = f.read()
 
-    hedyPET is a comprehensive data explorer for FDG PET/CT imaging data from 100 healthy humans.
-    This tool provides interactive visualizations and statistical analysis of:
-
-    - **Time Activity Curves (TACs)**: Explore organ uptake over time with various normalization methods
-    - **Organ Means**: Analyze static organ uptake values across different demographics
-    - **Patlak Analysis**: Examine glucose metabolic rates using Patlak kinetic modeling
-    """)
-
-    # Quick Links section prominently displayed
-    st.markdown("## Resources")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.link_button("📘 Visit GitHub Repository", "https://github.com/your-repo-url", use_container_width=True)
-    with col2:
-        st.link_button("📖 How to Acquire Data", "https://your-acquisition-website.com", use_container_width=True)
-
-    st.markdown("""
-    ---
-
-    ## Features
-
-    - Multiple normalization methods (SUV, SUL variants)
-    - Demographic grouping (age, sex)
-    - Erosion iterations for organ mask refinement
-    - Statistical uncertainty visualization (confidence intervals, prediction intervals)
-    - Interactive filtering and comparison tools
-
-    ## Citation
-
-    If you use this data or tool in your research, please cite:
-
-    > [Citation information to be added]
-
-    ## Contact
-
-    For questions or feedback, please open an issue on the GitHub repository.
-    """)
+    st.markdown(about_content, unsafe_allow_html=True)
