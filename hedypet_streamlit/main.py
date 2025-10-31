@@ -36,6 +36,44 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+st.markdown("""
+<style>
+    /* Reduce top padding but leave room for header */
+    .block-container {
+        padding-top: 3rem;
+        padding-bottom: 3rem;
+    }
+    /* Keep header compact and fixed */
+    header[data-testid="stHeader"] {
+        backdrop-filter: blur(10px);
+        height: 2.5rem;
+        position: fixed;
+        top: 0;
+        z-index: 999;
+    }
+    /* Reduce sidebar top padding */
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 2rem !important;
+    }
+    [data-testid="stSidebarContent"] {
+        padding-top: 2rem;
+    }
+
+    /* --- ADD THIS CODE TO REMOVE ROUNDED CORNERS --- */
+    [data-testid="stImage"] {
+        border-radius: 0px !important;
+    }
+    
+    [data-testid="stImage"] img {
+        border-radius: 0px !important;
+    }
+    /* --- END OF ADDED CODE --- */
+
+</style>
+""", unsafe_allow_html=True)
+
+
 # Legacy data loader - no longer used
 # @st.cache_data
 # def generate_mu_data():
@@ -1041,5 +1079,7 @@ elif chosen_id == "tab5":
     about_path = os.path.join(os.path.dirname(__file__), "about.md")
     with open(about_path, "r") as f:
         about_content = f.read()
-
+    st.image(os.path.join(os.path.dirname(__file__),"imgs/banner.jpg"))
     st.markdown(about_content, unsafe_allow_html=True)
+
+    st.image(os.path.join(os.path.dirname(__file__),"imgs/regionh.jpg"),width=400)

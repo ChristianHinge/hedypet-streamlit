@@ -1,13 +1,10 @@
-# About hedyPET
+# hedyPET
 
 **He**althy **Dy**namic **PET** (hedyPET) is a multimodal whole-body PET/CT/MRI dataset of 100 healthy controls stratified on age and sex. Listmode and nifti files of 80 participants are shared in Brain Imaging Data Structure (BIDs) format with the goal of increasing reproducibility and advancing research in the healthy PET connectome, multimodal learning, image reconstruction, attenuation correction, glucose kinetics, and image registration. The remaining 20 participants is held as a test-set for an upcoming medical imaging challenge and will be released at a later date. 
 
 All data was acquired at the Department of Clinical Physiology and Nuclear Medicine, Copenhagen University Hospital, Rigshospitalet.
 
 ## Resources
-
-
-![alt text](/homes/hinge/Projects/hedyPET/src/hedypet/analysis/img.png "Title")
 
 [📘 GitHub Repository](https://github.com/depict-rh/hedyPET)
 
